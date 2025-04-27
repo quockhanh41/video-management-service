@@ -1,0 +1,14 @@
+.env
+
+output/
+
+temp/
+
+*.mp4
+*.mp3
+*.jpg
+*.png
+*.gif
+*.webp
+
+.venv/
