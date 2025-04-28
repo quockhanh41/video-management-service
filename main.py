@@ -7,12 +7,19 @@ from service.video_service import VideoService
 import asyncio
 import threading
 import os
-
-app = FastAPI()
+from contextlib import asynccontextmanager
+import config.moviepy_config  # Import cấu hình MoviePy
 
 # Khởi tạo services
 message_service = MessageService()
 video_service = VideoService()
+
+async def process_video(message):
+    """Callback function để xử lý video"""
+    await video_service._create_video({
+        "video_id": message.video_id,
+        "data": message.data
+    })
 
 def run_consumer():
     """Chạy consumer trong một thread riêng"""
@@ -21,28 +28,28 @@ def run_consumer():
         message_service.connect()
         
         # Thiết lập callback xử lý video
-        message_service.set_callback(lambda message: video_service._create_video({
-            "video_id": message.video_id,
-            "data": message.data
-        }))
+        message_service.set_callback(process_video)
         
+        # Bắt đầu consume messages
         message_service.consume_messages()
     except Exception as e:
         print(f"Lỗi trong consumer thread: {str(e)}")
 
-@app.on_event("startup")
-async def startup_event():
-    """Khởi động consumer khi API server khởi động"""
-    # Tạo thread mới để chạy consumer
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler"""
+    # Startup
     consumer_thread = threading.Thread(target=run_consumer, daemon=True)
     consumer_thread.start()
     print("Consumer đã được khởi động")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Đóng kết nối khi API server tắt"""
+    
+    yield
+    
+    # Shutdown
     message_service.close()
     print("Consumer đã được đóng")
+
+app = FastAPI(lifespan=lifespan)
 
 # Include routers
 app.include_router(video_router, prefix="/api/v1")

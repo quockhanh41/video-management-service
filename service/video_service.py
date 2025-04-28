@@ -5,13 +5,14 @@ import requests
 from datetime import datetime
 from bson import ObjectId
 from config.mongodb import MongoDB
-from moviepy.editor import AudioFileClip, ImageClip, concatenate_videoclips, VideoFileClip
+from moviepy.editor import AudioFileClip, ImageClip, concatenate_videoclips, VideoFileClip, TextClip, CompositeVideoClip, CompositeAudioClip, VideoClip
 import concurrent.futures
 from functools import lru_cache
 import tempfile
 from pathlib import Path
 from models.message_model import VideoMessage
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
+from config.cloudinary import CloudinaryConfig
 
 class VideoService:
     def __init__(self):
@@ -19,6 +20,7 @@ class VideoService:
         self.video_collection = self.mongodb.get_collection("videos")
         self.temp_dir = Path("temp")
         self.temp_dir.mkdir(exist_ok=True)
+        self.cloudinary = CloudinaryConfig()
     
     async def generate_video(self, data: Dict[str, Any]) -> Dict[str, str]:
         """
@@ -142,12 +144,61 @@ class VideoService:
         except Exception as e:
             raise Exception(f"Lỗi khi tải {file_type} {index}: {str(e)}")
 
-    def _create_video(self, message: Dict[str, Any]) -> str:
+    def _add_subtitle(self, clip: VideoClip, text: str, duration: float) -> VideoClip:
+        """
+        Thêm phụ đề vào video clip
+        """
+        try:
+            # Tạo text clip với font mặc định
+            txt_clip = TextClip(
+                text,
+                fontsize=70,
+                color='white',
+                bg_color='black',
+                font='Arial',
+                method='caption',
+                size=(clip.w, None),
+                align='center'
+            )
+            
+            # Đặt vị trí và thời gian
+            txt_clip = txt_clip.set_position(('center', 'bottom')).set_duration(duration)
+            
+            # Kết hợp với video
+            return CompositeVideoClip([clip, txt_clip])
+        except Exception as e:
+            print(f"Lỗi khi thêm phụ đề: {str(e)}")
+            return clip  # Trả về clip gốc nếu có lỗi
+
+    def _add_background_music(self, clip: VideoClip, music_path: str) -> VideoClip:
+        """
+        Thêm nhạc nền vào video
+        """
+        # Tải nhạc nền
+        music = AudioFileClip(music_path)
+        
+        # Lặp nhạc nếu cần
+        if music.duration < clip.duration:
+            music = music.loop(duration=clip.duration)
+        else:
+            music = music.subclip(0, clip.duration)
+        
+        # Giảm âm lượng nhạc nền
+        music = music.volumex(0.3)
+        
+        # Kết hợp với audio gốc
+        final_audio = CompositeAudioClip([clip.audio, music])
+        
+        # Gán audio mới vào video
+        return clip.set_audio(final_audio)
+
+    async def _create_video(self, message: Dict[str, Any]) -> str:
         """
         Tạo video từ model sử dụng moviepy
         """
         video_id = message["video_id"]
         data = message["data"]
+        temp_files = []  # Danh sách các file tạm cần dọn dẹp
         
         try:
             # Cập nhật trạng thái đang xử lý
@@ -197,6 +248,7 @@ class VideoService:
                 # Lấy kết quả
                 temp_images = [f.result() for f in image_futures]
                 temp_audios = [f.result() for f in audio_futures]
+                temp_files.extend(temp_images + temp_audios)
             
             # 2. Generate video for each script-image-audio combination
             video_model.progress = 50
@@ -211,37 +263,40 @@ class VideoService:
             # Tạo video cho từng cặp script-image-audio
             temp_videos = []
             for i, (image_path, audio_path) in enumerate(zip(temp_images, temp_audios)):
-                # Sử dụng context manager để đảm bảo đóng file
                 with AudioFileClip(audio_path) as audio:
                     audio_duration = audio.duration
+
+                # Resize ảnh trước khi tạo clip
+                img = Image.open(image_path)
+                img = img.resize((1920, 1080), Image.Resampling.LANCZOS)
+                img_path = str(self.temp_dir / f"resized_{i}.jpg")
+                img.save(img_path)
+                temp_files.append(img_path)
                 
-                # Tạo video từ ảnh
-                with ImageClip(image_path) as clip:
-                    # Resize ảnh trước khi tạo clip
-                    img = Image.open(image_path)
-                    img = img.resize((1920, 1080), Image.Resampling.LANCZOS)
-                    img_path = str(self.temp_dir / f"resized_{i}.jpg")
-                    img.save(img_path)
-                    
-                    # Tạo clip từ ảnh đã resize
-                    clip = ImageClip(img_path).set_duration(audio_duration).on_color(
-                        size=(1920, 1080), color=(0,0,0), pos='center'
-                    )
-                    
-                    # Thêm hiệu ứng crossfade nếu không phải ảnh đầu tiên
-                    if i > 0:
-                        clip = clip.crossfadein(0.5)
-                    
-                    # Lưu video tạm
-                    temp_video_path = str(self.temp_dir / f"video_{i}.mp4")
-                    clip.write_videofile(
-                        temp_video_path,
-                        fps=24,
-                        codec="libx264",
-                        audio=False,
-                        preset="ultrafast"  # Tối ưu tốc độ encoding
-                    )
-                    temp_videos.append(temp_video_path)
+                # Tạo clip từ ảnh đã resize
+                clip = ImageClip(img_path).set_duration(audio_duration).on_color(
+                    size=(1920, 1080), color=(0,0,0), pos='center'
+                )
+                
+                # Thêm hiệu ứng crossfade nếu không phải ảnh đầu tiên
+                if i > 0:
+                    clip = clip.crossfadein(0.5)
+                
+                # Thêm phụ đề nếu có
+                if video_model.subtitle:
+                    clip = self._add_subtitle(clip, video_model.scripts[i], audio_duration)
+                
+                # Lưu video tạm
+                temp_video_path = str(self.temp_dir / f"video_{i}.mp4")
+                clip.write_videofile(
+                    temp_video_path,
+                    fps=24,
+                    codec="libx264",
+                    audio=False,
+                    preset="ultrafast"  # Tối ưu tốc độ encoding
+                )
+                temp_videos.append(temp_video_path)
+                temp_files.append(temp_video_path)
 
                 # Combine video and audio
                 with VideoFileClip(temp_video_path) as video, AudioFileClip(audio_path) as audio:
@@ -253,7 +308,7 @@ class VideoService:
                         audio_codec="aac",
                         preset="ultrafast"
                     )
-                
+            
             # 3. Combine all videos
             video_model.progress = 70
             video_model.log = "Đang ghép hình ảnh với âm thanh..."
@@ -277,7 +332,12 @@ class VideoService:
                         "log": video_model.log
                     })
                     
-                    # TODO: Thêm nhạc nền nếu cần
+                    # Tải nhạc nền
+                    music_path = self._download_file(video_model.backgroundMusic, "music", 0)
+                    temp_files.append(music_path)
+                    
+                    # Thêm nhạc nền
+                    final_video = self._add_background_music(final_video, music_path)
                 
                 # 5. Export final video
                 video_model.progress = 100
@@ -298,12 +358,40 @@ class VideoService:
                     preset="ultrafast"
                 )
             
-            # Cleanup
-            self._cleanup(temp_images + temp_audios + temp_videos)
+            # 6. Upload video lên Cloudinary
+            video_model.log = "Đang upload video lên Cloudinary..."
+            self._update_video_status({
+                "video_id": video_id,
+                "status": video_model.status,
+                "progress": video_model.progress,
+                "log": video_model.log
+            })
+            
+            # Upload video
+            upload_result = self.cloudinary.upload_file(
+                video_model.output_video,
+                folder="videos"
+            )
+            
+            # 7. Cập nhật MongoDB với URL video
+            self.video_collection.update_one(
+                {"_id": ObjectId(video_id)},
+                {
+                    "$set": {
+                        "output_video": upload_result["secure_url"],
+                    }
+                }
+            )
+            
+            # 8. Cleanup
+            self._cleanup(temp_files)
             
             return video_id
             
         except Exception as e:
+            # Cleanup trong trường hợp lỗi
+            self._cleanup(temp_files)
+            
             self._update_video_status({
                 "video_id": video_id,
                 "status": "failed",

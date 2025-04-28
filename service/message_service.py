@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 from models.message_model import VideoMessage
 from service.video_service import VideoService
+import asyncio
 
 load_dotenv()
 
@@ -50,7 +51,7 @@ class MessageService:
                     delivery_mode=2,  # make message persistent
                 )
             )
-            print(f"Đã gửi message: {message}")
+            print(f"Đã gửi message: {message['video_id']}")
             
         except Exception as e:
             print(f"Lỗi khi gửi message: {str(e)}")
@@ -71,7 +72,13 @@ class MessageService:
                 
                 # Gọi callback function nếu có
                 if self.callback:
-                    self.callback(message)
+                    # Tạo event loop mới để chạy async function
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        loop.run_until_complete(self.callback(message))
+                    finally:
+                        loop.close()
                 
                 # Xác nhận đã xử lý xong
                 ch.basic_ack(delivery_tag=method.delivery_tag)

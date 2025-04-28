@@ -12,3 +12,6 @@ temp/
 *.webp
 
 .venv/
+
+# pycache folders
+__pycache__/
