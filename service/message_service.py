@@ -6,8 +6,12 @@ from dotenv import load_dotenv
 from models.message_model import VideoMessage
 from service.video_service import VideoService
 import asyncio
+from bson.objectid import ObjectId
+import logging
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 class MessageService:
     def __init__(self):
@@ -15,6 +19,7 @@ class MessageService:
         self.channel = None
         self.queue_name = "video_creation_queue"
         self.callback = None
+        self.video_service = VideoService()
         
     def connect(self):
         """Kết nối đến RabbitMQ server"""
@@ -108,3 +113,34 @@ class MessageService:
         except Exception as e:
             print(f"Lỗi khi consume messages: {str(e)}")
             raise 
+
+    async def _process_message(self, message: Dict[str, Any]):
+        """
+        Xử lý message từ queue
+        """
+        try:
+            # Lấy thông tin video từ MongoDB
+            video = self.video_collection.find_one({"_id": ObjectId(message["video_id"])})
+            if not video:
+                raise ValueError(f"Video {message['video_id']} không tồn tại")
+
+            # Cập nhật trạng thái đang xử lý
+            self.video_service._update_video_status({
+                "video_id": str(video["_id"]),
+                "status": "processing",
+                "progress": 0,
+                "log": "Đang xử lý video..."
+            })
+
+            # Xử lý video
+            await self.video_service.process_video(message)
+
+        except Exception as e:
+            logger.error(f"Lỗi xử lý message: {str(e)}")
+            # Cập nhật trạng thái lỗi với progress 0
+            self.video_service._update_video_status({
+                "video_id": message["video_id"],
+                "status": "error",
+                "progress": 0,
+                "log": f"Lỗi: {str(e)}"
+            }) 

@@ -1,12 +1,8 @@
 from fastapi import FastAPI, HTTPException
-from models.video_model import VideoModel
-from controllers.video_controller import VideoController
 from routes.video_routes import router as video_router
 from service.message_service import MessageService
 from service.video_service import VideoService
-import asyncio
 import threading
-import os
 from contextlib import asynccontextmanager
 import config.moviepy_config  # Import cấu hình MoviePy
 
