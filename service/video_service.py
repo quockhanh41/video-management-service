@@ -14,8 +14,6 @@ from config.cloudinary import CloudinaryConfig
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 import cloudinary
 from service.vid_transition_func import create_transition
-from contextlib import contextmanager
-import shutil
 
 class VideoService:
     def __init__(self):
@@ -24,15 +22,6 @@ class VideoService:
         self.temp_dir = Path("temp")
         self.temp_dir.mkdir(exist_ok=True)
         self.cloudinary = CloudinaryConfig()
-    
-    @contextmanager
-    def _temp_file_manager(self):
-        """Context manager để quản lý file tạm"""
-        temp_files = []
-        try:
-            yield temp_files
-        finally:
-            self._cleanup(temp_files)
     
     async def generate_video(self, data: Dict[str, Any]) -> Dict[str, str]:
         """
@@ -297,130 +286,6 @@ class VideoService:
             print(f"Lỗi khi thêm nhạc nền: {str(e)}")
             return clip
 
-    def _process_audio(self, audio_clip: AudioFileClip, segment_duration: float, strategy: str, max_speed: float) -> AudioFileClip:
-        """
-        Xử lý audio clip theo chiến lược được chọn
-        Args:
-            audio_clip: Audio clip cần xử lý
-            segment_duration: Thời lượng mong muốn của segment
-            strategy: Chiến lược xử lý ('extendDuration', 'trimAudio', 'speedUp')
-            max_speed: Tốc độ tối đa cho phép khi tăng tốc
-        Returns:
-            Audio clip đã được xử lý
-        """
-        if audio_clip.duration <= segment_duration:
-            return audio_clip.set_duration(segment_duration)
-            
-        if strategy == "extendDuration":
-            return audio_clip
-        elif strategy == "trimAudio":
-            return audio_clip.subclip(0, segment_duration)
-        else:  # speedUp
-            speed_factor = audio_clip.duration / segment_duration
-            if speed_factor <= max_speed:
-                return audio_clip.speedx(speed_factor)
-            return audio_clip.subclip(0, segment_duration)
-
-    def _create_transition_clip(self, clip1: VideoClip, clip2: VideoClip, transition_type: str, fps: int, temp_dir: str) -> VideoClip:
-        """
-        Tạo transition clip giữa hai video clip
-        Args:
-            clip1: Clip đầu tiên
-            clip2: Clip thứ hai
-            transition_type: Loại transition
-            fps: Frame rate
-            temp_dir: Thư mục tạm
-        Returns:
-            Transition clip
-        """
-        try:
-            # Tạo file video tạm thời cho clip trước
-            temp_video1 = os.path.join(temp_dir, "temp_video1.mp4")
-            clip1.write_videofile(
-                temp_video1,
-                fps=fps,
-                codec='libx264',
-                audio=False
-            )
-            
-            # Tạo file video tạm thời cho clip hiện tại
-            temp_video2 = os.path.join(temp_dir, "temp_video2.mp4")
-            clip2.write_videofile(
-                temp_video2,
-                fps=fps,
-                codec='libx264',
-                audio=False
-            )
-            
-            # Tạo transition video
-            transition_video = create_transition(
-                input_videos=[temp_video1, temp_video2],
-                temp_path=temp_dir,
-                animation=transition_type,
-                num_frames=30,
-                max_brightness=1.5
-            )
-            
-            # Tạo clip transition
-            return VideoFileClip(transition_video)
-            
-        except Exception as e:
-            print(f"Lỗi khi tạo transition: {str(e)}")
-            return None
-
-    def _upload_to_cloudinary(self, video_path: str, video_id: str, duration: int) -> str:
-        """
-        Upload video lên Cloudinary và cập nhật thông tin trong database
-        Args:
-            video_path: Đường dẫn đến file video
-            video_id: ID của video trong database
-            duration: Thời lượng của video
-        Returns:
-            URL của video đã upload
-        """
-        try:
-            # Định nghĩa eager transformations cho HLS
-            eager_transformations = [
-                {
-                    "format": "m3u8",
-                    "streaming_profile": "full_hd",
-                    "transformation": [
-                        {"width": 1920, "height": 1080, "crop": "limit"},
-                        {"quality": "auto"},
-                        {"fetch_format": "auto"}
-                    ]
-                }
-            ]
-            
-            # Upload video
-            upload_result = self.cloudinary.upload_file(
-                video_path,
-                folder="videos",
-                eager_transformations=eager_transformations
-            )
-            
-            # Cập nhật thông tin trong database
-            self.video_collection.update_one(
-                {"_id": ObjectId(video_id)},
-                {
-                    "$set": {
-                        "outputPath": upload_result["secure_url"],
-                        "cloudinaryPublicId": upload_result["public_id"],
-                        "duration": duration
-                    }
-                }
-            )
-            
-            # Xóa file local
-            if os.path.exists(video_path):
-                os.remove(video_path)
-                
-            return upload_result["secure_url"]
-            
-        except Exception as e:
-            print(f"Lỗi khi upload video lên Cloudinary: {str(e)}")
-            raise Exception(f"Lỗi khi upload video: {str(e)}")
-
     async def _create_video(self, message: Dict[str, Any]) -> str:
         """
         Tạo video từ model sử dụng moviepy
@@ -428,146 +293,231 @@ class VideoService:
         video_id = message["video_id"]
         data = message["data"]
         final_clip = None
+        temp_files = []
         
-        with self._temp_file_manager() as temp_files:
-            try:
-                # Tạo model từ data
-                video_model = VideoModel(**data)
+        try:
+            # Tạo model từ data
+            video_model = VideoModel(**data)
+            
+            # Cập nhật trạng thái
+            self._update_video_status({
+                "video_id": video_id,
+                "status": "processing",
+                "progress": 0,
+                "log": "Đang tải các file..."
+            })
+            
+            # Tải tất cả các file
+            for segment in video_model.segments:
+                # Tải ảnh
+                image_path = self._download_file(segment.image, "image", segment.index)
+                temp_files.append(image_path)
                 
-                # Cập nhật trạng thái
-                self._update_video_status({
-                    "video_id": video_id,
-                    "status": "processing",
-                    "progress": 0,
-                    "log": "Đang tải các file..."
-                })
-                
-                # Tải tất cả các file
-                for segment in video_model.segments:
-                    # Tải ảnh
-                    image_path = self._download_file(segment.image, "image", segment.index)
-                    temp_files.append(image_path)
+                # Tải audio
+                audio_path = self._download_file(segment.audio, "audio", segment.index)
+                temp_files.append(audio_path)
+            
+            # Tải nhạc nền nếu có
+            if video_model.backgroundMusic:
+                bg_music_path = self._download_file(video_model.backgroundMusic, "audio", -1)
+                temp_files.append(bg_music_path)
+            
+            # Tạo các video từ ảnh
+            clips = []
+            for i, segment in enumerate(video_model.segments):
+                try:
+                    # Tạo image clip
+                    image_path = temp_files[i * 2]
+                    image_clip = ImageClip(image_path)
                     
-                    # Tải audio
-                    audio_path = self._download_file(segment.audio, "audio", segment.index)
-                    temp_files.append(audio_path)
-                
-                # Tải nhạc nền nếu có
-                if video_model.backgroundMusic:
-                    bg_music_path = self._download_file(video_model.backgroundMusic, "audio", -1)
-                    temp_files.append(bg_music_path)
-                
-                # Tạo các video từ ảnh
-                clips = []
-                for i, segment in enumerate(video_model.segments):
-                    try:
-                        # Tạo image clip
-                        image_path = temp_files[i * 2]
-                        image_clip = ImageClip(image_path)
-                        image_clip = image_clip.set_duration(segment.duration)
-                        image_clip = image_clip.set_fps(video_model.videoSettings.frameRate)
-                        
-                        # Tạo và xử lý audio clip
-                        audio_path = temp_files[i * 2 + 1]
-                        audio_clip = AudioFileClip(audio_path)
-                        audio_clip = self._process_audio(
-                            audio_clip,
+                    # Đặt thời lượng cho clip
+                    image_clip = image_clip.set_duration(segment.duration)
+                    
+                    # Đặt FPS
+                    image_clip = image_clip.set_fps(video_model.videoSettings.frameRate)
+                    
+                    # Tạo audio clip
+                    audio_path = temp_files[i * 2 + 1]
+                    audio_clip = AudioFileClip(audio_path)
+                    
+                    # Xử lý audio theo chiến lược
+                    if audio_clip.duration > segment.duration:
+                        if video_model.videoSettings.audioMismatchStrategy == "extendDuration":
+                            # Kéo dài image duration = audio duration
+                            image_clip = image_clip.set_duration(audio_clip.duration)
+                        elif video_model.videoSettings.audioMismatchStrategy == "trimAudio":
+                            # Cắt audio
+                            audio_clip = audio_clip.subclip(0, segment.duration)
+                        else:  # speedUp
+                            # Tăng tốc audio
+                            speed_factor = audio_clip.duration / segment.duration
+                            if speed_factor <= video_model.videoSettings.maxAudioSpeed:
+                                audio_clip = audio_clip.speedx(speed_factor)
+                            else:
+                                # Nếu vượt quá tốc độ tối đa, cắt audio
+                                audio_clip = audio_clip.subclip(0, segment.duration)
+                    else:
+                        # Nếu audio ngắn hơn hoặc bằng segment duration, giữ nguyên
+                        audio_clip = audio_clip.set_duration(segment.duration)
+                    
+                    # Kết hợp image và audio
+                    clip = image_clip.set_audio(audio_clip)
+                    
+                    # Thêm phụ đề nếu được bật
+                    if video_model.subtitle.enabled:
+                        clip = self._add_subtitle(
+                            clip,
+                            segment.script,
                             segment.duration,
-                            video_model.videoSettings.audioMismatchStrategy,
-                            video_model.videoSettings.maxAudioSpeed
+                            video_model.subtitle.style
                         )
-                        
-                        # Kết hợp image và audio
-                        clip = image_clip.set_audio(audio_clip)
-                        
-                        # Thêm phụ đề nếu được bật
-                        if video_model.subtitle.enabled:
-                            clip = self._add_subtitle(
-                                clip,
-                                segment.script,
-                                segment.duration,
-                                video_model.subtitle.style
-                            )
-                        
-                        clips.append(clip)
-                        
-                        # Cập nhật tiến độ
-                        progress = int((i + 1) / len(video_model.segments) * 100)
-                        self._update_video_status({
-                            "video_id": video_id,
-                            "progress": progress,
-                            "log": f"Đang xử lý segment {i + 1}/{len(video_model.segments)}..."
-                        })
-                    except Exception as e:
-                        raise Exception(f"Lỗi khi xử lý segment {i}: {str(e)}")
-                
-                # Tạo transition giữa các video
-                final_clips = []
-                for i in range(len(clips)):
-                    if i > 0:  # Thêm transition cho tất cả các clip trừ clip đầu tiên
-                        transition_clip = self._create_transition_clip(
-                            clips[i-1],
-                            clips[i],
-                            video_model.segments[i].transition.type,
-                            video_model.videoSettings.frameRate,
-                            str(self.temp_dir)
-                        )
-                        if transition_clip:
-                            final_clips.append(transition_clip)
-                            temp_files.extend([
-                                os.path.join(str(self.temp_dir), "temp_video1.mp4"),
-                                os.path.join(str(self.temp_dir), "temp_video2.mp4")
-                            ])
                     
-                    # Thêm clip hiện tại vào danh sách
-                    final_clips.append(clips[i])
+                    clips.append(clip)
+                    
+                    # Cập nhật tiến độ
+                    progress = int((i + 1) / len(video_model.segments) * 100)
+                    self._update_video_status({
+                        "video_id": video_id,
+                        "progress": progress,
+                        "log": f"Đang xử lý segment {i + 1}/{len(video_model.segments)}..."
+                    })
+                except Exception as e:
+                    raise Exception(f"Lỗi khi xử lý segment {i}: {str(e)}")
+            
+            # Tạo transition giữa các video
+            final_clips = []
+            for i in range(len(clips)):
+                if i > 0:  # Thêm transition cho tất cả các clip trừ clip đầu tiên
+                    try:
+                        # Tạo file video tạm thời cho clip trước
+                        temp_video1 = os.path.join(str(self.temp_dir), f"temp_video1_{i}.mp4")
+                        clips[i-1].write_videofile(
+                            temp_video1,
+                            fps=video_model.videoSettings.frameRate,
+                            codec='libx264',
+                            audio=False
+                        )
+                        temp_files.append(temp_video1)
+                        
+                        # Tạo file video tạm thời cho clip hiện tại
+                        temp_video2 = os.path.join(str(self.temp_dir), f"temp_video2_{i}.mp4")
+                        clips[i].write_videofile(
+                            temp_video2,
+                            fps=video_model.videoSettings.frameRate,
+                            codec='libx264',
+                            audio=False
+                        )
+                        temp_files.append(temp_video2)
+                        
+                        # Tạo transition video
+                        transition_video = create_transition(
+                            input_videos=[temp_video1, temp_video2],
+                            temp_path=str(self.temp_dir),
+                            animation=video_model.segments[i].transition.type,
+                            num_frames=30,
+                            max_brightness=1.5
+                        )
+                        
+                        # Tạo clip transition
+                        transition_clip = VideoFileClip(transition_video)
+                        final_clips.append(transition_clip)
+                        
+                    except Exception as e:
+                        print(f"Lỗi khi tạo transition: {str(e)}")
+                        # Nếu có lỗi, bỏ qua transition và tiếp tục với clip tiếp theo
+                        continue
                 
-                # Kết hợp tất cả các clip
-                final_clip = concatenate_videoclips(final_clips, method="compose")
+                # Thêm clip hiện tại vào danh sách
+                final_clips.append(clips[i])
+            
+            # Kết hợp tất cả các clip
+            final_clip = concatenate_videoclips(final_clips, method="compose")
+            
+            # Thêm nhạc nền nếu có
+            if video_model.backgroundMusic:
+                final_clip = self._add_background_music(final_clip, bg_music_path)
+            
+            # Xuất video
+            final_clip.write_videofile(
+                video_model.output_video,
+                fps=video_model.videoSettings.frameRate,
+                codec='libx264',
+                audio_codec='aac',
+                bitrate=video_model.videoSettings.bitrate,
+                threads=24,
+                preset='medium'
+            )
+            
+            # Lấy duration của video
+            video_model.duration = int(final_clip.duration)
+            
+            # Upload video lên Cloudinary
+            try:
+                # Định nghĩa eager transformations cho HLS
+                eager_transformations = [
+                    {
+                        "format": "m3u8",
+                        "streaming_profile": "full_hd",
+                        "transformation": [
+                            {"width": 1920, "height": 1080, "crop": "limit"},
+                            {"quality": "auto"},
+                            {"fetch_format": "auto"}
+                        ]
+                    }
+                ]
                 
-                # Thêm nhạc nền nếu có
-                if video_model.backgroundMusic:
-                    final_clip = self._add_background_music(final_clip, bg_music_path)
-                
-                # Xuất video
-                final_clip.write_videofile(
+                upload_result = self.cloudinary.upload_file(
                     video_model.output_video,
-                    fps=video_model.videoSettings.frameRate,
-                    codec='libx264',
-                    audio_codec='aac',
-                    bitrate=video_model.videoSettings.bitrate,
-                    threads=24,
-                    preset='medium'
+                    folder="videos",
+                    eager_transformations=eager_transformations
                 )
                 
-                # Lấy duration của video
-                video_model.duration = int(final_clip.duration)
-                
-                # Upload video lên Cloudinary
-                output_url = self._upload_to_cloudinary(
-                    video_model.output_video,
-                    video_id,
-                    video_model.duration
+                # Cập nhật outputPath và duration trong MongoDB
+                self.video_collection.update_one(
+                    {"_id": ObjectId(video_id)},
+                    {
+                        "$set": {
+                            "outputPath": upload_result["secure_url"],
+                            "cloudinaryPublicId": upload_result["public_id"],
+                            "duration": video_model.duration
+                        }
+                    }
                 )
                 
-                # Cập nhật trạng thái hoàn thành
-                self._update_video_status({
-                    "video_id": video_id,
-                    "status": "done",
-                    "progress": 100,
-                    "log": "Hoàn thành!"
-                })
-                
-                return output_url
-                
+                # Xóa file video local sau khi upload thành công
+                if os.path.exists(video_model.output_video):
+                    os.remove(video_model.output_video)
+                    
             except Exception as e:
-                # Cập nhật trạng thái lỗi
-                self._update_video_status({
-                    "video_id": video_id,
-                    "status": "failed",
-                    "log": f"Lỗi: {str(e)}"
-                })
-                raise Exception(f"Lỗi khi tạo video: {str(e)}")
+                print(f"Lỗi khi upload video lên Cloudinary: {str(e)}")
+                raise Exception(f"Lỗi khi upload video: {str(e)}")
+            
+            # Cập nhật trạng thái hoàn thành
+            self._update_video_status({
+                "video_id": video_id,
+                "status": "done",
+                "progress": 100,
+                "log": "Hoàn thành!"
+            })
+            
+            return upload_result["secure_url"]
+            
+        except Exception as e:
+            # Cập nhật trạng thái lỗi
+            self._update_video_status({
+                "video_id": video_id,
+                "status": "failed",
+                "log": f"Lỗi: {str(e)}"
+            })
+            raise Exception(f"Lỗi khi tạo video: {str(e)}")
+        finally:
+            # Dọn dẹp các file tạm và giải phóng tài nguyên
+            if final_clip:
+                try:
+                    final_clip.close()
+                except:
+                    pass
+            self._cleanup(temp_files)
 
     def _update_video_status(self, data: Dict[str, Any]):
         """
