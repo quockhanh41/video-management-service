@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 
 class Transition(BaseModel):
-    type: Literal["fade", "slide", "zoom", "wipe", "dissolve", "fade_to_black"]
+    type: Literal["rotation", "rotation_inv", "zoom_in", "zoom_out", "translation", "translation_inv", "long_translation", "long_translation_inv"]
     duration: float
 
 class SubtitleStyle(BaseModel):
