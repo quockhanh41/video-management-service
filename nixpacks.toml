@@ -1,11 +1,14 @@
 [phases.setup]
 nixPkgs = ['ffmpeg', 'python39', 'python39Packages.pip']
 
-[start]
-cmd = "python main.py"
-
 [phases.install]
 cmds = [
   "python -m pip install --upgrade pip",
   "pip install -r requirements.txt"
-] 
+]
+
+[start]
+cmd = "python main.py"
+
+[phases.setup]
+aptPkgs = ['ffmpeg'] 
