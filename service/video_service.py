@@ -410,13 +410,16 @@ class VideoService:
                         temp_files.append(temp_video2)
                         
                         # Tạo transition video
-                        transition_video = create_transition(
+                        transition_video, transition_files = create_transition(
                             input_videos=[temp_video1, temp_video2],
                             temp_path=str(self.temp_dir),
                             animation=video_model.segments[i].transition.type,
                             num_frames=30,
                             max_brightness=1.5
                         )
+                        
+                        # Thêm các file transition vào danh sách để xóa sau
+                        temp_files.extend(transition_files)
                         
                         # Tạo clip transition
                         transition_clip = VideoFileClip(transition_video)

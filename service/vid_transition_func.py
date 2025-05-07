@@ -44,7 +44,7 @@ def create_transition(
         merge_phases (bool): Gộp các pha lại với nhau
         
     Returns:
-        str: Đường dẫn đến video đã được tạo trong thư mục tạm
+        tuple: (str, list) - Đường dẫn đến video đã được tạo và danh sách các file transition
     """
     # Kiểm tra số lượng video đầu vào
     if len(input_videos) < 2:
@@ -53,6 +53,9 @@ def create_transition(
     # Chuyển đổi đường dẫn thành Path objects
     input_videos = [pathlib.Path(video) for video in input_videos]
     output = pathlib.Path(output) if output else None
+    
+    # Danh sách các file transition được tạo ra
+    transition_files = []
     
     # Tạo thư mục tạm cho quá trình xử lý
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -120,15 +123,26 @@ def create_transition(
         if merge_phases:
             if not data_handler.merge_video_chunks():
                 raise ValueError("Không thể gộp các pha video")
-            return str(data_handler.merged_vid)
+            # Thêm các file transition vào danh sách
+            transition_files.extend([
+                str(data_handler.phase1_vid),
+                str(data_handler.phase2_vid),
+                str(data_handler.merged_vid)
+            ])
+            return str(data_handler.merged_vid), transition_files
         else:
-            return str(data_handler.phase1_vid), str(data_handler.phase2_vid)
+            # Thêm các file transition vào danh sách
+            transition_files.extend([
+                str(data_handler.phase1_vid),
+                str(data_handler.phase2_vid)
+            ])
+            return str(data_handler.phase1_vid), str(data_handler.phase2_vid), transition_files
 
 # Ví dụ sử dụng
 if __name__ == "__main__":
     # Ví dụ sử dụng hàm
     try:
-        output = create_transition(
+        output, transition_files = create_transition(
             input_videos=["E:/TKPM/video-editing-py-script/Input/video1.mp4", "E:/TKPM/video-editing-py-script/Input/video2.mp4"],
             animation="zoom_out",
             temp_path="temp",
@@ -139,5 +153,6 @@ if __name__ == "__main__":
         # output = concatenate_videoclips([VideoFileClip("E:/TKPM/video-editing-py-script/Input/video1.mp4"), VideoFileClip("E:/TKPM/video-editing-py-script/Output/output_merged.mp4"), VideoFileClip("E:/TKPM/video-editing-py-script/Input/video2.mp4")])
         # output.write_videofile("E:/TKPM/video-editing-py-script/Output/output_merged_final.mp4")
         print(f"Video đã được tạo: {output}")
+        print(f"Các file transition được tạo: {transition_files}")
     except Exception as e:
         print(f"Lỗi: {e}") 
