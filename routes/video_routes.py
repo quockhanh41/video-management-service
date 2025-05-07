@@ -91,7 +91,7 @@ async def get_video_preview(videoId: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/video/{videoId}", response_model=VideoDetailResponse)
+@router.get("/video/details/{videoId}", response_model=VideoDetailResponse)
 async def get_video_detail(videoId: str):
     try:
         return await video_controller.get_video_detail(videoId)
