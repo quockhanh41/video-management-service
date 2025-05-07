@@ -32,9 +32,6 @@ class VideoService:
             Dict chứa message và videoId
         """
         try:
-            # Validate ObjectId
-            ObjectId(data["scriptId"])
-            
             # Validate inputs
             self._validate_inputs(data)
             
