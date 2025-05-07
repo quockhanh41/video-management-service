@@ -5,9 +5,15 @@ from pathlib import Path
 # Lấy đường dẫn thư mục gốc của project
 ROOT_DIR = Path(__file__).parent.parent
 
-# Cấu hình đường dẫn ImageMagick
-IMAGEMAGICK_PATH = r"C:\Program Files\ImageMagick-7.1.1-Q16\magick.exe"
-# IMAGEMAGICK_PATH = os.path.join(ROOT_DIR, "bin", "ImageMagick", "magick.exe")
+# Cấu hình đường dẫn ImageMagick dựa vào môi trường
+NODE_ENV = os.getenv("NODE_ENV", "development")
+
+if NODE_ENV == "production":
+    # Trong môi trường production (Railway), sử dụng đường dẫn mặc định
+    IMAGEMAGICK_PATH = "magick"
+else:
+    # Trong môi trường development, sử dụng đường dẫn local
+    IMAGEMAGICK_PATH = r"C:\Program Files\ImageMagick-7.1.1-Q16\magick.exe"
 
 change_settings({"IMAGEMAGICK_BINARY": IMAGEMAGICK_PATH})
 
