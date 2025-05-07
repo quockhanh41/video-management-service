@@ -10,7 +10,7 @@ NODE_ENV = os.getenv("NODE_ENV", "development")
 
 if NODE_ENV == "production":
     # Trong môi trường production (Railway), sử dụng đường dẫn mặc định
-    IMAGEMAGICK_PATH = "/usr/bin/magick"
+    IMAGEMAGICK_PATH = "/usr/bin/ImageMagick"
 else:
     # Trong môi trường development, sử dụng đường dẫn local
     IMAGEMAGICK_PATH = r"C:\Program Files\ImageMagick-7.1.1-Q16\magick.exe"
