@@ -231,13 +231,33 @@ class VideoService:
         Thêm phụ đề vào video clip với style tùy chỉnh
         """
         try:
+            # Danh sách các font có sẵn trong hệ thống
+            system_fonts = [
+                'Arial',
+                'Helvetica',
+                'Times New Roman',
+                'Courier New',
+                'Verdana',
+                'Georgia',
+                'Tahoma',
+                'Trebuchet MS',
+                'Impact',
+                'Comic Sans MS'
+            ]
+            
+            # Kiểm tra và sử dụng font có sẵn
+            font = style.font
+            if font not in system_fonts:
+                print(f"Font {font} không có sẵn, sử dụng font mặc định Arial")
+                font = 'Arial'
+            
             # Tạo text clip với style được chỉ định
             txt_clip = TextClip(
                 text,
                 fontsize=style.size,
                 color=style.color,
                 bg_color=style.background,
-                font=style.font,
+                font=font,
                 method='caption',
                 size=(clip.w, None),
                 align='center'
