@@ -47,6 +47,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+@app.get("/health")
+async def health_check():
+    """Endpoint kiểm tra trạng thái hoạt động của ứng dụng"""
+    return {"status": "healthy"}
+
 # Include routers
 app.include_router(video_router, prefix="/api/v1")
 
