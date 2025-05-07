@@ -5,6 +5,8 @@ from service.video_service import VideoService
 import threading
 from contextlib import asynccontextmanager
 import config.moviepy_config  # Import cấu hình MoviePy
+import sys
+import platform
 
 # Khởi tạo services
 message_service = MessageService()
@@ -51,6 +53,16 @@ app = FastAPI(lifespan=lifespan)
 async def health_check():
     """Endpoint kiểm tra trạng thái hoạt động của ứng dụng"""
     return {"status": "healthy"}
+
+@app.get("/info")
+async def get_info():
+    """Endpoint hiển thị thông tin về môi trường chạy"""
+    return {
+        "python_version": sys.version,
+        "platform": platform.platform(),
+        "python_implementation": platform.python_implementation(),
+        "python_compiler": platform.python_compiler()
+    }
 
 # Include routers
 app.include_router(video_router, prefix="/api/v1")
