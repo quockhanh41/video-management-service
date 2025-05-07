@@ -84,16 +84,16 @@ async def get_video_status(videoId: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/video/{videoId}", response_model=VideoDetailResponse)
-async def get_video_detail(videoId: str):
-    try:
-        return await video_controller.get_video_detail(videoId)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
 @router.get("/video/preview/{videoId}", response_model=VideoPreviewResponse)
 async def get_video_preview(videoId: str):
     try:
         return await video_controller.get_video_preview(videoId)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/video/{videoId}", response_model=VideoDetailResponse)
+async def get_video_detail(videoId: str):
+    try:
+        return await video_controller.get_video_detail(videoId)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e)) 
