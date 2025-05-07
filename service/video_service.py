@@ -617,7 +617,6 @@ class VideoService:
         try:
             # Kiểm tra ObjectId hợp lệ
             ObjectId(video_id)
-            print(video_id)
             # Tìm video trong database
             video = self.video_collection.find_one({"_id": ObjectId(video_id)})
             if not video:
