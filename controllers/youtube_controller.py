@@ -57,28 +57,33 @@ class YouTubeController:
             # Tổ chức dữ liệu theo yêu cầu
             result = {
                 "userId": user_id,
-                "videos": {}
+                "videos": []
             }
             
             for video in videos:
-                video_id = str(video["_id"])
-                platform_videos = []
+                video_info = {
+                    "videoId": str(video["_id"]),
+                    "outputPath": video.get("outputPath", ""),
+                    "createdAt": video.get("createdAt", datetime.now()).isoformat(),
+                    "duration": video.get("duration", 0),
+                    "platform_videos": []
+                }
                 
                 # Lấy thông tin video trên các platform
                 if "platform_videos" in video:
                     for platform, platform_info in video["platform_videos"].items():
-                        platform_video = PlatformVideo(
-                            platform=platform,
-                            video_id=platform_info.get("video_id", ""),
-                            url=platform_info.get("url", ""),
-                            upload_status=platform_info.get("upload_status", ""),
-                            upload_time=platform_info.get("upload_time"),
-                            error_message=platform_info.get("error_message"),
-                            error_time=platform_info.get("error_time")
-                        )
-                        platform_videos.append(platform_video)
+                        platform_video = {
+                            "platform": platform,
+                            "video_id": platform_info.get("video_id", ""),
+                            "url": platform_info.get("url", ""),
+                            "upload_status": platform_info.get("upload_status", ""),
+                            "upload_time": platform_info.get("upload_time"),
+                            "error_message": platform_info.get("error_message"),
+                            "error_time": platform_info.get("error_time")
+                        }
+                        video_info["platform_videos"].append(platform_video)
                 
-                result["videos"][video_id] = platform_videos
+                result["videos"].append(video_info)
             
             logger.info(f"Đã lấy thành công danh sách video của user: {user_id}")
             return result
