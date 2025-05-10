@@ -1,0 +1,29 @@
+{
+  "userId": "6804ecb4f084b887e359c43d",
+  "videos": [
+    {
+      "videoId": "681f35897fae8577b3282e11",
+      "outputPath": "https://res.cloudinary.com/dqre1zvql/video/upload/v1746875890/videos/fssbqbb2e7i7rknxobyu.mp4",
+      "createdAt": "2025-05-10 18:16:25.911000",
+      "duration": 62,
+      "platform_videos": [
+        {
+          "platform": "youtube",
+          "video_id": "uHgN-rd9lBg",
+          "url": "https://www.youtube.com/watch?v=uHgN-rd9lBg",
+          "upload_status": "success",
+          "upload_time": "2025-05-10T22:47:02.274977",
+          "error_message": null,
+          "error_time": null
+        }
+      ]
+    },
+    {
+      "videoId": "681f35897fae8577b3282e11",
+      "outputPath": "https://res.cloudinary.com/dqre1zvql/video/upload/v1746875890/videos/fssbqbb2e7i7rknxobyu.mp4",
+      "createdAt": "2025-05-10 18:16:25.911000",
+      "duration": 62,
+      "platform_videos": []
+    }
+  ]
+}

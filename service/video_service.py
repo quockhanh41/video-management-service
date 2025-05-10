@@ -15,6 +15,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 import cloudinary
 from service.vid_transition_func import create_transition
 import random
+from utils.time_utils import get_current_vn_time, format_vn_time
 
 class VideoService:
     def __init__(self):
@@ -75,7 +76,7 @@ class VideoService:
                 "status": video_model.status,
                 "progress": video_model.progress,
                 "log": video_model.log,
-                "createdAt": datetime.now(),
+                "createdAt": get_current_vn_time(),
                 "outputPath": video_model.output_video
             }
             result = self.video_collection.insert_one(video_data)
@@ -670,7 +671,7 @@ class VideoService:
                 "outputPath": video.get("outputPath", ""),
                 "status": video.get("status", "unknown"),
                 "duration": video.get("duration", 0),
-                "createdAt": video.get("createdAt", datetime.now())
+                "createdAt": format_vn_time(video.get("createdAt", get_current_vn_time()))
             }
             
         except Exception as e:

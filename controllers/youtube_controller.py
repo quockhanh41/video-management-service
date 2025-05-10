@@ -14,6 +14,7 @@ from bson import ObjectId
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 import logging
 from datetime import datetime
+from utils.time_utils import to_vietnam_time, get_current_vn_time
 
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO)
@@ -57,28 +58,33 @@ class YouTubeController:
             # Tổ chức dữ liệu theo yêu cầu
             result = {
                 "userId": user_id,
-                "videos": {}
+                "videos": []
             }
             
             for video in videos:
-                video_id = str(video["_id"])
-                platform_videos = []
+                video_info = {
+                    "videoId": str(video["_id"]),
+                    "outputPath": video.get("outputPath", ""),
+                    "createdAt": to_vietnam_time(video.get("createdAt", datetime.now())),
+                    "duration": video.get("duration", 0),
+                    "platform_videos": []
+                }
                 
                 # Lấy thông tin video trên các platform
                 if "platform_videos" in video:
                     for platform, platform_info in video["platform_videos"].items():
-                        platform_video = PlatformVideo(
-                            platform=platform,
-                            video_id=platform_info.get("video_id", ""),
-                            url=platform_info.get("url", ""),
-                            upload_status=platform_info.get("upload_status", ""),
-                            upload_time=platform_info.get("upload_time"),
-                            error_message=platform_info.get("error_message"),
-                            error_time=platform_info.get("error_time")
-                        )
-                        platform_videos.append(platform_video)
+                        platform_video = {
+                            "platform": platform,
+                            "video_id": platform_info.get("video_id", ""),
+                            "url": platform_info.get("url", ""),
+                            "upload_status": platform_info.get("upload_status", ""),
+                            "upload_time": to_vietnam_time(platform_info.get("upload_time")) if platform_info.get("upload_time") else None,
+                            "error_message": platform_info.get("error_message"),
+                            "error_time": to_vietnam_time(platform_info.get("error_time")) if platform_info.get("error_time") else None
+                        }
+                        video_info["platform_videos"].append(platform_video)
                 
-                result["videos"][video_id] = platform_videos
+                result["videos"].append(video_info)
             
             logger.info(f"Đã lấy thành công danh sách video của user: {user_id}")
             return result
@@ -223,7 +229,7 @@ class YouTubeController:
                             "video_id": result.get("videoId", ""),
                             "url": result.get("url", ""),
                             "upload_status": "success",
-                            "upload_time": datetime.now().isoformat()
+                            "upload_time": get_current_vn_time()
                         }
                     }
                 }
@@ -248,7 +254,7 @@ class YouTubeController:
                                     "url": "",
                                     "upload_status": "failed",
                                     "error_message": str(e),
-                                    "error_time": datetime.now().isoformat()
+                                    "error_time": get_current_vn_time()
                                 }
                             }
                         }

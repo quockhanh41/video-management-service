@@ -34,4 +34,4 @@ class PlatformVideo(BaseModel):
 
 class UserVideosResponse(BaseModel):
     userId: str
-    videos: Dict[str, List[PlatformVideo]]  # Key là videoId, value là danh sách video trên các platform 
+    videos: List[Dict[str, Any]]  # Danh sách video với thông tin chi tiết 

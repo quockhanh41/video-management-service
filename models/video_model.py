@@ -1,7 +1,8 @@
 from pydantic import BaseModel
-from typing import List, Literal, Optional, Dict
+from typing import List, Literal, Optional, Dict, Any
 import os
 from datetime import datetime
+from utils.time_utils import get_current_vn_time, format_vn_time
 
 class Transition(BaseModel):
     type: Literal["rotation", "rotation_inv", "zoom_in", "zoom_out", "translation", "translation_inv", "long_translation", "long_translation_inv"]
@@ -82,4 +83,4 @@ class VideoModel(BaseModel):
             self.platform_videos[platform].upload_status = status
             self.platform_videos[platform].error_message = error_message
             if status == "success":
-                self.platform_videos[platform].upload_time = datetime.now()
+                self.platform_videos[platform].upload_time = format_vn_time(get_current_vn_time())

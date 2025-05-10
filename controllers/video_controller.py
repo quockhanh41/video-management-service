@@ -6,6 +6,7 @@ import requests
 import os
 from datetime import datetime
 from bson import ObjectId
+from utils.time_utils import get_current_vn_time, format_vn_time
 
 class VideoController:
     def __init__(self):
@@ -198,7 +199,7 @@ class VideoController:
                 "url": video_info.get("outputPath", ""),
                 "status": video_info.get("status", "unknown"),
                 "duration": video_info.get("duration", 0),
-                "createdAt": video_info.get("createdAt", datetime.now())
+                "createdAt": video_info.get("createdAt", get_current_vn_time())
             }
         except Exception as e:
             raise Exception(f"Lỗi khi lấy thông tin video: {str(e)}")
@@ -221,4 +222,8 @@ class VideoController:
                 "publicId": video_info.get("publicId", "")
             }
         except Exception as e:
-            raise Exception(f"Lỗi khi lấy URL stream: {str(e)}") 
+            raise Exception(f"Lỗi khi lấy URL stream: {str(e)}")
+
+    def _generate_video_name(self) -> str:
+        """Tạo tên file video duy nhất"""
+        return f"video_{format_vn_time(get_current_vn_time()).replace(':', '').replace('/', '')}" 
