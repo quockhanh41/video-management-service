@@ -37,7 +37,7 @@ class VideoController:
         Kiểm tra tính hợp lệ của các input
         """
         # Kiểm tra các trường bắt buộc
-        required_fields = ["scriptId", "segments", "subtitle", "videoSettings"]
+        required_fields = ["job_id", "segments", "subtitle", "videoSettings"]
         for field in required_fields:
             if field not in data:
                 raise ValueError(f"Thiếu trường bắt buộc: {field}")
@@ -194,7 +194,7 @@ class VideoController:
             
             return {
                 "videoId": video_id,
-                "scriptId": video_info.get("scriptId", ""),
+                "job_id": video_info.get("job_id", ""),
                 "url": video_info.get("outputPath", ""),
                 "status": video_info.get("status", "unknown"),
                 "duration": video_info.get("duration", 0),

@@ -39,7 +39,8 @@ class Segment(BaseModel):
     transition: Transition
 
 class VideoGenerateRequest(BaseModel):
-    scriptId: str
+    job_id: str
+    user_id: str
     segments: List[Segment]
     subtitle: Subtitle
     videoSettings: VideoSettings
@@ -57,7 +58,7 @@ class VideoStatusResponse(BaseModel):
 
 class VideoDetailResponse(BaseModel):
     videoId: str
-    scriptId: str
+    job_id: str
     url: str
     status: str
     duration: int

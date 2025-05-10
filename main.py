@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from routes.video_routes import router as video_router
+from routes.youtube_routes import router as youtube_router
 from service.message_service import MessageService
 from service.video_service import VideoService
 import threading
@@ -19,33 +20,20 @@ async def process_video(message):
         "data": message.data
     })
 
-def run_consumer():
-    """Chạy consumer trong một thread riêng"""
-    try:
-        # Kết nối đến RabbitMQ
-        message_service.connect()
-        
-        # Thiết lập callback xử lý video
-        message_service.set_callback(process_video)
-        
-        # Bắt đầu consume messages
-        message_service.consume_messages()
-    except Exception as e:
-        print(f"Lỗi trong consumer thread: {str(e)}")
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan event handler"""
-    # Startup
-    consumer_thread = threading.Thread(target=run_consumer, daemon=True)
-    consumer_thread.start()
-    print("Consumer đã được khởi động")
+    # Thiết lập callback
+    message_service.set_callback(process_video)
     
+    # Khởi tạo worker thread
+    worker = threading.Thread(
+        target=message_service.consume_messages,
+        daemon=True
+    )
+    worker.start()
     yield
-    
-    # Shutdown
+    # Cleanup khi shutdown
     message_service.close()
-    print("Consumer đã được đóng")
 
 app = FastAPI(lifespan=lifespan)
 
@@ -66,6 +54,7 @@ async def get_info():
 
 # Include routers
 app.include_router(video_router, prefix="/api/v1")
+app.include_router(youtube_router, prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn

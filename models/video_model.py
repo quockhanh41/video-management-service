@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Dict
 import os
 from datetime import datetime
 
@@ -33,8 +33,17 @@ class Segment(BaseModel):
     duration: float
     transition: Transition
 
+class PlatformVideo(BaseModel):
+    platform: Literal["youtube", "facebook", "tiktok"]
+    video_id: str
+    url: str
+    upload_status: Literal["pending", "uploading", "success", "failed"] = "pending"
+    upload_time: Optional[datetime] = None
+    error_message: Optional[str] = None
+
 class VideoModel(BaseModel):
-    scriptId: str
+    job_id: str
+    user_id: str
     segments: List[Segment]
     subtitle: Subtitle
     videoSettings: VideoSettings
@@ -47,6 +56,9 @@ class VideoModel(BaseModel):
     log: str = ""
     duration: int = 0
     
+    # Platform upload information
+    platform_videos: Dict[str, PlatformVideo] = {}
+    
     def __init__(self, **data):
         super().__init__(**data)
         # Tạo đường dẫn output
@@ -55,3 +67,19 @@ class VideoModel(BaseModel):
         
         # Tạo thư mục nếu chưa tồn tại
         os.makedirs("output", exist_ok=True)
+        
+    def add_platform_video(self, platform: str, video_id: str, url: str):
+        """Thêm thông tin video đã upload lên platform"""
+        self.platform_videos[platform] = PlatformVideo(
+            platform=platform,
+            video_id=video_id,
+            url=url
+        )
+        
+    def update_platform_status(self, platform: str, status: str, error_message: Optional[str] = None):
+        """Cập nhật trạng thái upload lên platform"""
+        if platform in self.platform_videos:
+            self.platform_videos[platform].upload_status = status
+            self.platform_videos[platform].error_message = error_message
+            if status == "success":
+                self.platform_videos[platform].upload_time = datetime.now()

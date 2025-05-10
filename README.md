@@ -39,7 +39,7 @@ POST /api/video/generate
 Request body:
 ```json
 {
-  "scriptId": "script_42",
+  "job_id": "script_42",
   "segments": [
     {
       "index": 0,
@@ -106,7 +106,7 @@ Response:
 ```json
 {
   "videoId": "vid_321",
-  "scriptId": "script_42",
+  "job_id": "script_42",
   "url": "https://cdn.example.com/videos/vid_321.mp4",
   "status": "done",
   "duration": 134,

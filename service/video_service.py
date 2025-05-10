@@ -14,6 +14,7 @@ from config.cloudinary import CloudinaryConfig
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 import cloudinary
 from service.vid_transition_func import create_transition
+import random
 
 class VideoService:
     def __init__(self):
@@ -22,6 +23,18 @@ class VideoService:
         self.temp_dir = Path("temp")
         self.temp_dir.mkdir(exist_ok=True)
         self.cloudinary = CloudinaryConfig()
+        
+        # Danh sách các transition type có sẵn
+        self.transition_types = [
+            "rotation",
+            "rotation_inv",
+            "zoom_in",
+            "zoom_out",
+            "translation",
+            "translation_inv",
+            "long_translation",
+            "long_translation_inv"
+        ]
     
     async def generate_video(self, data: Dict[str, Any]) -> Dict[str, str]:
         """
@@ -33,14 +46,15 @@ class VideoService:
         """
         try:
             # Validate ObjectId
-            ObjectId(data["scriptId"])
+            ObjectId(data["job_id"])
             
             # Validate inputs
             self._validate_inputs(data)
             
             # Tạo model
             video_model = VideoModel(
-                scriptId=data["scriptId"],
+                job_id=data["job_id"],
+                user_id=data["user_id"],
                 segments=data["segments"],
                 subtitle=data["subtitle"],
                 videoSettings=data["videoSettings"],
@@ -52,7 +66,8 @@ class VideoService:
             
             # Lưu thông tin video vào MongoDB
             video_data = {
-                "scriptId": data["scriptId"],
+                "job_id": data["job_id"],
+                "user_id": data["user_id"],
                 "segments": data["segments"],
                 "subtitle": data["subtitle"],
                 "videoSettings": data["videoSettings"],
@@ -80,7 +95,7 @@ class VideoService:
         """
         try:
             # Kiểm tra các trường bắt buộc
-            required_fields = ["scriptId", "segments", "subtitle", "videoSettings"]
+            required_fields = ["job_id", "segments", "subtitle", "videoSettings"]
             for field in required_fields:
                 if field not in data:
                     raise ValueError(f"Thiếu trường bắt buộc: {field}")
@@ -429,11 +444,19 @@ class VideoService:
                         )
                         temp_files.append(temp_video2)
                         
+                        # Lấy transition type hoặc chọn ngẫu nhiên nếu không có
+                        transition_type = None
+                        if hasattr(video_model.segments[i], 'transition') and hasattr(video_model.segments[i].transition, 'type'):
+                            transition_type = video_model.segments[i].transition.type
+                        
+                        if not transition_type or transition_type not in self.transition_types:
+                            transition_type = random.choice(self.transition_types)
+                        
                         # Tạo transition video
                         transition_video, transition_files = create_transition(
                             input_videos=[temp_video1, temp_video2],
                             temp_path=str(self.temp_dir),
-                            animation=video_model.segments[i].transition.type,
+                            animation=transition_type,
                             num_frames=30,
                             max_brightness=1.5
                         )
@@ -643,7 +666,7 @@ class VideoService:
                 raise ValueError(f"Không tìm thấy video với ID: {video_id}")
             
             return {
-                "scriptId": video.get("scriptId", ""),
+                "job_id": video.get("job_id", ""),
                 "outputPath": video.get("outputPath", ""),
                 "status": video.get("status", "unknown"),
                 "duration": video.get("duration", 0),
