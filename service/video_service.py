@@ -5,14 +5,18 @@ from datetime import datetime
 from bson import ObjectId
 from config.mongodb import MongoDB
 from service.shotstack_service import ShotstackService
+from config.cloudinary import CloudinaryConfig
 import asyncio
 import time
+import requests
+import tempfile
 
 class VideoService:
     def __init__(self):
         self.mongodb = MongoDB()
         self.video_collection = self.mongodb.get_collection("videos")
         self.shotstack = ShotstackService()
+        self.cloudinary = CloudinaryConfig()
     
     async def generate_video(self, data: Dict[str, Any]) -> Dict[str, str]:
         """
@@ -95,6 +99,73 @@ class VideoService:
         except Exception as e:
             raise Exception(f"Lỗi khi tạo video: {str(e)}")
 
+    async def upload_to_cloudinary(self, video_url: str, video_id: str) -> dict:
+        """
+        Tải video từ URL và upload lên Cloudinary
+        Args:
+            video_url: URL của video cần upload
+            video_id: ID của video trong database
+        Returns:
+            Dict chứa thông tin về video trên Cloudinary
+        """
+        try:
+            # Tải video về máy tạm thời
+            response = requests.get(video_url, stream=True)
+            if response.status_code != 200:
+                raise Exception("Không thể tải video từ URL")
+
+            # Tạo file tạm thời
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_file:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        temp_file.write(chunk)
+                temp_file_path = temp_file.name
+
+            # Upload lên Cloudinary với cấu hình streaming
+            result = self.cloudinary.upload_file(
+                temp_file_path,
+                folder=f"videos/{video_id}",
+                resource_type="video",
+                eager_transformations=[
+                    {
+                        "format": "m3u8",
+                        "streaming_profile": "hd"
+                    }
+                ]
+            )
+
+            # Tạo thumbnail riêng
+            thumbnail_result = self.cloudinary.upload_file(
+                temp_file_path,
+                folder=f"videos/{video_id}/thumbnails",
+                resource_type="video",
+                eager_transformations=[
+                    {
+                        "format": "jpg",
+                        "quality": "auto",
+                        "width": 1280,
+                        "height": 720,
+                        "crop": "fill"
+                    }
+                ]
+            )
+
+            # Xóa file tạm thời
+            os.unlink(temp_file_path)
+
+            # Tạo streaming URL
+            streaming_url = result["secure_url"].replace(".mp4", ".m3u8")
+            
+            return {
+                "video_url": result["secure_url"],
+                "streaming_url": streaming_url,
+                "thumbnail_url": thumbnail_result["eager"][0]["secure_url"] if thumbnail_result.get("eager") else None,
+                "public_id": result["public_id"]
+            }
+
+        except Exception as e:
+            raise Exception(f"Lỗi khi upload video lên Cloudinary: {str(e)}")
+
     async def check_render_status(self, video_id: str, render_id: str):
         """
         Kiểm tra trạng thái render của video
@@ -104,7 +175,7 @@ class VideoService:
         
         for attempt in range(max_attempts):
             try:
-                # Kiểm tra trạng thái render
+                # # Kiểm tra trạng thái render
                 render_status = self.shotstack.get_render_status(render_id)
                 
                 if not render_status:
@@ -116,13 +187,16 @@ class VideoService:
                     # Lấy URL video từ response
                     video_url = render_status["response"]["url"]
                     
+                    # Upload video lên Cloudinary
+                    cloudinary_info = await self.upload_to_cloudinary(video_url, video_id)
+                    
                     # Lấy thông tin video từ database để tính duration
                     video = self.video_collection.find_one({"_id": ObjectId(video_id)})
                     if not video:
                         raise ValueError(f"Không tìm thấy video với ID: {video_id}")
                         
-                    # Tính tổng duration từ các segments
-                    total_duration = sum(segment.get("duration", 0) for segment in video.get("segments", []))
+                    # Tính tổng duration dạng int từ các segments
+                    total_duration = sum(int(segment.get("duration", 0)) for segment in video.get("segments", []))
                     
                     # Cập nhật trạng thái, URL video và duration
                     self.video_collection.update_one(
@@ -130,7 +204,11 @@ class VideoService:
                         {
                             "$set": {
                                 "status": "done",
-                                "outputPath": video_url,
+                                "originPath": video_url,  # URL gốc từ Shotstack
+                                "outputPath": cloudinary_info["video_url"],  # URL MP4 trên Cloudinary
+                                "streamingUrl": cloudinary_info["streaming_url"],
+                                "thumbnailUrl": cloudinary_info["thumbnail_url"],
+                                "cloudinaryPublicId": cloudinary_info["public_id"],
                                 "progress": 100,
                                 "log": "Hoàn thành!",
                                 "duration": total_duration
@@ -295,6 +373,7 @@ class VideoService:
             return {
                 "videoId": video_id,
                 "job_id": video.get("job_id", ""),
+                "streamUrl": video.get("streamingUrl", ""),
                 "script_id": video.get("script_id", ""),
                 "url": video.get("outputPath", ""),
                 "status": video.get("status", "unknown"),
@@ -331,9 +410,16 @@ class VideoService:
             if not video_url:
                 raise ValueError("Không tìm thấy URL video")
             
+            # Lấy URL stream từ streamingUrl
+            streaming_url = video.get("streamingUrl")
+            if not streaming_url:
+                raise ValueError("Không tìm thấy URL stream")
+            
             return {
-                "streamUrl": video_url
+                "streamUrl": streaming_url,
+                "url": video_url
             }
             
         except Exception as e:
             raise Exception(f"Lỗi khi lấy URL stream: {str(e)}") 
+        

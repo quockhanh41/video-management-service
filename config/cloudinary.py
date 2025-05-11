@@ -22,13 +22,14 @@ class CloudinaryConfig:
             api_secret=os.getenv("CLOUDINARY_API_SECRET")
         )
     
-    def upload_file(self, file_path: str, folder: str = "video_assets", eager_transformations: list = None) -> dict:
+    def upload_file(self, file_path: str, folder: str = "video_assets", eager_transformations: list = None, resource_type: str = "auto") -> dict:
         """
         Upload file lên Cloudinary
         Args:
             file_path: Đường dẫn file cần upload
             folder: Thư mục trên Cloudinary
             eager_transformations: Danh sách các transformation cần tạo trước
+            resource_type: Loại resource (auto, image, video, raw)
         Returns:
             Dict chứa thông tin file đã upload
         """
@@ -36,7 +37,7 @@ class CloudinaryConfig:
             result = cloudinary.uploader.upload(
                 file_path,
                 folder=folder,
-                resource_type="video",
+                resource_type=resource_type,
                 eager_async=True,
                 eager=eager_transformations,
                 eager_notification_url=os.getenv("CLOUDINARY_NOTIFICATION_URL", None)

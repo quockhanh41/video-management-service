@@ -77,7 +77,6 @@ class ShotstackService:
                 "asset": {
                     "type": "audio",
                     "src": segment["audio"],
-                    "volume": 0.2
                 },
                 "start": current_time,
                 "length": segment["duration"]
@@ -92,7 +91,7 @@ class ShotstackService:
                 "asset": {
                     "type": "audio",
                     "src": background_music,
-                    "volume": 0.3
+                    "volume": 0.2
                 },
                 "start": 0,
                 "length": current_time

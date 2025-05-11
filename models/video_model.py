@@ -36,18 +36,18 @@ class VideoModel(BaseModel):
     log: str = ""
     duration: int = 0
     render_id: Optional[str] = None
-    outputPath: Optional[str] = None
+    outputPath: Optional[str] = None  # URL video MP4 trên Cloudinary
+    originPath: Optional[str] = None  # URL video gốc từ Shotstack
+    streamingUrl: Optional[str] = None  # URL streaming m3u8
+    thumbnailUrl: Optional[str] = None  # URL thumbnail
+    cloudinaryPublicId: Optional[str] = None  # Public ID trên Cloudinary
     
     # Platform upload information
     platform_videos: Dict[str, PlatformVideo] = {}
     
     def __init__(self, **data):
         super().__init__(**data)
-        # Tạo đường dẫn output
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.outputPath = f"output/video_{timestamp}.mp4"
-        
-        # Tạo thư mục nếu chưa tồn tại
+        # Tạo thư mục output nếu chưa tồn tại
         os.makedirs("output", exist_ok=True)
         
     def add_platform_video(self, platform: str, video_id: str, url: str):

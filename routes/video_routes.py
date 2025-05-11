@@ -15,7 +15,6 @@ from models.video_model import VideoModel
 
 router = APIRouter()
 video_controller = VideoController()
-shotstack_service = ShotstackService()
 
 # Load environment variables
 load_dotenv()
@@ -65,11 +64,13 @@ class VideoDetailResponse(BaseModel):
     job_id: str
     script_id: str
     url: str
+    streamUrl: str
     status: str
     duration: int
     createdAt: datetime
 
 class VideoPreviewResponse(BaseModel):
+    url: str
     streamUrl: str
 
 def submit_render(timeline_data):
