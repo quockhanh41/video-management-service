@@ -17,7 +17,7 @@ class MessageService:
     def __init__(self):
         self.connection = None
         self.channel = None
-        self.queue_name = "video_creation_queue"
+        self.queue_name = "video_creation_queue_test"
         self.callback = None
         self.video_service = VideoService()
         

@@ -3,35 +3,12 @@ from typing import List, Literal, Optional, Dict
 import os
 from datetime import datetime
 
-class Transition(BaseModel):
-    type: Literal["rotation", "rotation_inv", "zoom_in", "zoom_out", "translation", "translation_inv", "long_translation", "long_translation_inv"]
-    duration: float
-
-class SubtitleStyle(BaseModel):
-    font: str
-    size: int
-    color: str
-    background: str
-    position: str
-
-class Subtitle(BaseModel):
-    enabled: bool
-    style: SubtitleStyle
-
-class VideoSettings(BaseModel):
-    maxAudioSpeed: float
-    resolution: str
-    frameRate: int
-    bitrate: str
-    audioMismatchStrategy: Literal["extendDuration", "trimAudio", "speedUp"]
-
 class Segment(BaseModel):
     index: int
     script: str
     image: str
     audio: str
     duration: float
-    transition: Transition
 
 class PlatformVideo(BaseModel):
     platform: Literal["youtube", "facebook", "tiktok"]
@@ -42,20 +19,24 @@ class PlatformVideo(BaseModel):
     error_message: Optional[str] = None
 
 class VideoModel(BaseModel):
+    # Input fields
     job_id: str
     script_id: str
     user_id: str
     segments: List[Segment]
-    subtitle: Subtitle
-    videoSettings: VideoSettings
     backgroundMusic: Optional[str] = None
     
+    # Video settings
+    resolution: str = "1080"  # Độ phân giải mặc định là 1080p
+    aspectRatio: str = "16:9"  # Tỷ lệ khung hình mặc định là 16:9
+    
     # Generated fields
-    output_video: str = None
     status: Literal["pending", "processing", "done", "failed"] = "pending"
     progress: int = 0
     log: str = ""
     duration: int = 0
+    render_id: Optional[str] = None
+    outputPath: Optional[str] = None
     
     # Platform upload information
     platform_videos: Dict[str, PlatformVideo] = {}
@@ -64,7 +45,7 @@ class VideoModel(BaseModel):
         super().__init__(**data)
         # Tạo đường dẫn output
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.output_video = f"output/video_{timestamp}.mp4"
+        self.outputPath = f"output/video_{timestamp}.mp4"
         
         # Tạo thư mục nếu chưa tồn tại
         os.makedirs("output", exist_ok=True)
