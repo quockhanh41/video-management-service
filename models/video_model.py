@@ -43,6 +43,7 @@ class PlatformVideo(BaseModel):
 
 class VideoModel(BaseModel):
     job_id: str
+    script_id: str
     user_id: str
     segments: List[Segment]
     subtitle: Subtitle

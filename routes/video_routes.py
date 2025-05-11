@@ -40,6 +40,7 @@ class Segment(BaseModel):
 
 class VideoGenerateRequest(BaseModel):
     job_id: str
+    script_id: str
     user_id: str
     segments: List[Segment]
     subtitle: Subtitle
@@ -59,6 +60,7 @@ class VideoStatusResponse(BaseModel):
 class VideoDetailResponse(BaseModel):
     videoId: str
     job_id: str
+    script_id: str
     url: str
     status: str
     duration: int

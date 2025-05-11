@@ -64,6 +64,7 @@ class YouTubeController:
                 video_info = {
                     "videoId": str(video["_id"]),
                     "outputPath": video.get("outputPath", ""),
+                    "scriptId": video.get("script_id", ""),
                     "createdAt": video.get("createdAt", datetime.now()).isoformat(),
                     "duration": video.get("duration", 0),
                     "platform_videos": []

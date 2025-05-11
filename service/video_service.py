@@ -54,6 +54,7 @@ class VideoService:
             # Tạo model
             video_model = VideoModel(
                 job_id=data["job_id"],
+                script_id=data["script_id"],
                 user_id=data["user_id"],
                 segments=data["segments"],
                 subtitle=data["subtitle"],
@@ -67,6 +68,7 @@ class VideoService:
             # Lưu thông tin video vào MongoDB
             video_data = {
                 "job_id": data["job_id"],
+                "script_id": data["script_id"],
                 "user_id": data["user_id"],
                 "segments": data["segments"],
                 "subtitle": data["subtitle"],
@@ -95,7 +97,7 @@ class VideoService:
         """
         try:
             # Kiểm tra các trường bắt buộc
-            required_fields = ["job_id", "segments", "subtitle", "videoSettings"]
+            required_fields = ["job_id", "script_id", "segments", "subtitle", "videoSettings"]
             for field in required_fields:
                 if field not in data:
                     raise ValueError(f"Thiếu trường bắt buộc: {field}")
@@ -667,6 +669,7 @@ class VideoService:
             
             return {
                 "job_id": video.get("job_id", ""),
+                "script_id": video.get("script_id", ""),
                 "outputPath": video.get("outputPath", ""),
                 "status": video.get("status", "unknown"),
                 "duration": video.get("duration", 0),
