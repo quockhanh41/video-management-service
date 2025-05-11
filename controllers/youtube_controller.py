@@ -223,7 +223,7 @@ class YouTubeController:
             self.video_service.video_collection.update_one(
                 {"_id": ObjectId(data.videoId)},
                 {
-                    "$set": {
+                    "$push": {
                         "platform_videos.youtube": {
                             "platform": "youtube",
                             "video_id": result.get("videoId", ""),
