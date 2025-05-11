@@ -14,4 +14,7 @@ class VideoController:
         return await self.video_service.get_video_preview(video_id)
     
     async def get_video_detail(self, video_id: str):
-        return await self.video_service.get_video_detail(video_id) 
+        return await self.video_service.get_video_detail(video_id)
+    
+    async def delete_video(self, video_id: str):
+        return await self.video_service.delete_video(video_id) 

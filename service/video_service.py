@@ -421,5 +421,30 @@ class VideoService:
             }
             
         except Exception as e:
-            raise Exception(f"Lỗi khi lấy URL stream: {str(e)}") 
+            raise Exception(f"Lỗi khi lấy URL stream: {str(e)}")
+
+    async def delete_video(self, video_id: str) -> Dict[str, str]:
+        """
+        Xóa video từ database
+        Args:
+            video_id: ID của video cần xóa
+        Returns:
+            Dict chứa thông báo
+        """
+        try:
+            # Kiểm tra ObjectId hợp lệ
+            ObjectId(video_id)
+            
+            # Tìm và xóa video
+            result = self.video_collection.delete_one({"_id": ObjectId(video_id)})
+            
+            if result.deleted_count == 0:
+                raise ValueError(f"Không tìm thấy video với ID: {video_id}")
+                
+            return {
+                "message": "Xóa video thành công"
+            }
+            
+        except Exception as e:
+            raise Exception(f"Lỗi khi xóa video: {str(e)}") 
         

@@ -73,6 +73,9 @@ class VideoPreviewResponse(BaseModel):
     url: str
     streamUrl: str
 
+class VideoDeleteResponse(BaseModel):
+    message: str
+
 def submit_render(timeline_data):
     """
     Gửi request render video đến Shotstack API
@@ -136,5 +139,15 @@ async def get_video_detail(videoId: str):
     """
     try:
         return await video_controller.get_video_detail(videoId)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.delete("/video/{videoId}", response_model=VideoDeleteResponse)
+async def delete_video(videoId: str):
+    """
+    Route xóa video
+    """
+    try:
+        return await video_controller.delete_video(videoId)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e)) 
