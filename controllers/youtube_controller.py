@@ -51,8 +51,8 @@ class YouTubeController:
         try:
             logger.info(f"Bắt đầu lấy danh sách video của user: {user_id}")
             
-            # Lấy tất cả video của user từ database
-            videos = self.video_service.video_collection.find({"user_id": user_id})
+            # Lấy tất cả video của user từ database, điều kiện status là done
+            videos = self.video_service.video_collection.find({"user_id": user_id, "status": "done"})
             
             # Tổ chức dữ liệu theo yêu cầu
             result = {

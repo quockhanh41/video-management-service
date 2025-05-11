@@ -64,7 +64,7 @@ class VideoDetailResponse(BaseModel):
     job_id: str
     script_id: str
     url: str
-    streamUrl: str
+    originUrl: str
     status: str
     duration: int
     createdAt: datetime

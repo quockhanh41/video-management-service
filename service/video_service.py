@@ -121,23 +121,10 @@ class VideoService:
                         temp_file.write(chunk)
                 temp_file_path = temp_file.name
 
-            # Upload lên Cloudinary với cấu hình streaming
+            # Upload lên Cloudinary
             result = self.cloudinary.upload_file(
                 temp_file_path,
                 folder=f"videos/{video_id}",
-                resource_type="video",
-                eager_transformations=[
-                    {
-                        "format": "m3u8",
-                        "streaming_profile": "hd"
-                    }
-                ]
-            )
-
-            # Tạo thumbnail riêng
-            thumbnail_result = self.cloudinary.upload_file(
-                temp_file_path,
-                folder=f"videos/{video_id}/thumbnails",
                 resource_type="video",
                 eager_transformations=[
                     {
@@ -152,14 +139,10 @@ class VideoService:
 
             # Xóa file tạm thời
             os.unlink(temp_file_path)
-
-            # Tạo streaming URL
-            streaming_url = result["secure_url"].replace(".mp4", ".m3u8")
             
             return {
                 "video_url": result["secure_url"],
-                "streaming_url": streaming_url,
-                "thumbnail_url": thumbnail_result["eager"][0]["secure_url"] if thumbnail_result.get("eager") else None,
+                "thumbnail_url": result["eager"][0]["secure_url"] if result.get("eager") else None,
                 "public_id": result["public_id"]
             }
 
@@ -175,7 +158,7 @@ class VideoService:
         
         for attempt in range(max_attempts):
             try:
-                # # Kiểm tra trạng thái render
+                # Kiểm tra trạng thái render
                 render_status = self.shotstack.get_render_status(render_id)
                 
                 if not render_status:
@@ -186,6 +169,14 @@ class VideoService:
                 if status == "done":
                     # Lấy URL video từ response
                     video_url = render_status["response"]["url"]
+                    
+                    # Lưu URL gốc
+                    self.video_collection.update_one(
+                        {"_id": ObjectId(video_id)},
+                        {
+                            "$set": { "originPath": video_url }
+                        }
+                    )
                     
                     # Upload video lên Cloudinary
                     cloudinary_info = await self.upload_to_cloudinary(video_url, video_id)
@@ -204,9 +195,7 @@ class VideoService:
                         {
                             "$set": {
                                 "status": "done",
-                                "originPath": video_url,  # URL gốc từ Shotstack
-                                "outputPath": cloudinary_info["video_url"],  # URL MP4 trên Cloudinary
-                                "streamingUrl": cloudinary_info["streaming_url"],
+                                "outputPath": cloudinary_info["video_url"],
                                 "thumbnailUrl": cloudinary_info["thumbnail_url"],
                                 "cloudinaryPublicId": cloudinary_info["public_id"],
                                 "progress": 100,
@@ -373,7 +362,7 @@ class VideoService:
             return {
                 "videoId": video_id,
                 "job_id": video.get("job_id", ""),
-                "streamUrl": video.get("streamingUrl", ""),
+                "originUrl": video.get("originPath", ""),
                 "script_id": video.get("script_id", ""),
                 "url": video.get("outputPath", ""),
                 "status": video.get("status", "unknown"),
@@ -401,22 +390,18 @@ class VideoService:
             if not video:
                 raise ValueError(f"Không tìm thấy video với ID: {video_id}")
             
-            # Kiểm tra trạng thái video
-            if video.get("status") != "done":
-                raise ValueError("Video chưa sẵn sàng để xem trước")
-            
             # Lấy URL video từ outputPath
             video_url = video.get("outputPath")
             if not video_url:
                 raise ValueError("Không tìm thấy URL video")
             
-            # Lấy URL stream từ streamingUrl
-            streaming_url = video.get("streamingUrl")
-            if not streaming_url:
-                raise ValueError("Không tìm thấy URL stream")
+            # Lấy URL stream từ originPath
+            origin_url = video.get("originPath")
+            if not origin_url:
+                raise ValueError("Không tìm thấy origin url")
             
             return {
-                "streamUrl": streaming_url,
+                "streamUrl": origin_url,
                 "url": video_url
             }
             
