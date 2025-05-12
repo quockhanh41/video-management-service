@@ -71,18 +71,20 @@ class YouTubeController:
                 }
                 
                 # Lấy thông tin video trên các platform
-                if "platform_videos" in video:
-                    for platform, platform_info in video["platform_videos"].items():
-                        platform_video = {
-                            "platform": platform,
-                            "video_id": platform_info.get("video_id", ""),
-                            "url": platform_info.get("url", ""),
-                            "upload_status": platform_info.get("upload_status", ""),
-                            "upload_time": platform_info.get("upload_time"),
-                            "error_message": platform_info.get("error_message"),
-                            "error_time": platform_info.get("error_time")
-                        }
-                        video_info["platform_videos"].append(platform_video)
+                platform_videos = video.get("platform_videos", {})
+                if isinstance(platform_videos, dict):
+                    for platform, platform_info in platform_videos.items():
+                        if isinstance(platform_info, dict):
+                            platform_video = {
+                                "platform": platform,
+                                "video_id": platform_info.get("video_id", ""),
+                                "url": platform_info.get("url", ""),
+                                "upload_status": platform_info.get("upload_status", ""),
+                                "upload_time": platform_info.get("upload_time"),
+                                "error_message": platform_info.get("error_message"),
+                                "error_time": platform_info.get("error_time")
+                            }
+                            video_info["platform_videos"].append(platform_video)
                 
                 result["videos"].append(video_info)
             
