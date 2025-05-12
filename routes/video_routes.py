@@ -70,7 +70,7 @@ class VideoDetailResponse(BaseModel):
     createdAt: datetime
 
 class VideoPreviewResponse(BaseModel):
-    url: str
+    url: str = None
     streamUrl: str
 
 class VideoDeleteResponse(BaseModel):

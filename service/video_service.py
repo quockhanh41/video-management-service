@@ -392,9 +392,7 @@ class VideoService:
             
             # Lấy URL video từ outputPath
             video_url = video.get("outputPath")
-            if not video_url:
-                raise ValueError("Không tìm thấy URL video")
-            
+
             # Lấy URL stream từ originPath
             origin_url = video.get("originPath")
             if not origin_url:
