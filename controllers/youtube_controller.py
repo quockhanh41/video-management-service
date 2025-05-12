@@ -164,7 +164,7 @@ class YouTubeController:
             logger.info(f"Privacy status: {data.privacyStatus}")
             logger.info(f"Tags: {data.tags}")
             
-            # Lấy thông tin video từ database
+            # Lấy thông tin video trực tiếp từ database
             video_info = await self.video_service.get_video_detail(data.videoId)
             if video_info["status"] != "done":
                 raise Exception("Video chưa sẵn sàng để upload")
@@ -188,7 +188,8 @@ class YouTubeController:
             )
            
             # Tải video từ Cloudinary về local
-            if not video_info.get('outputPath'):
+            video_url = video_info.get('originUrl') or video_info.get('url')
+            if not video_url:
                 raise Exception("Không tìm thấy URL của video")
                 
             # Tạo thư mục temp nếu chưa tồn tại
@@ -200,7 +201,7 @@ class YouTubeController:
             video_path = os.path.join(temp_dir, f"{data.videoId}.mp4")
             
             # Tải video từ Cloudinary
-            download_result = os.system(f"curl -o {video_path} {video_info['outputPath']}")
+            download_result = os.system(f"curl -o {video_path} {video_url}")
             if download_result != 0:
                 raise Exception("Không thể tải video từ Cloudinary")
                 
