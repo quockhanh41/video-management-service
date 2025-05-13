@@ -74,17 +74,18 @@ class YouTubeController:
                 platform_videos = video.get("platform_videos", {})
                 if isinstance(platform_videos, dict):
                     for platform, platform_info in platform_videos.items():
-                        if isinstance(platform_info, dict):
-                            platform_video = {
-                                "platform": platform,
-                                "video_id": platform_info.get("video_id", ""),
-                                "url": platform_info.get("url", ""),
-                                "upload_status": platform_info.get("upload_status", ""),
-                                "upload_time": platform_info.get("upload_time"),
-                                "error_message": platform_info.get("error_message"),
-                                "error_time": platform_info.get("error_time")
-                            }
-                            video_info["platform_videos"].append(platform_video)
+                        if isinstance(platform_info, list):
+                            for platform_video in platform_info:
+                                if isinstance(platform_video, dict):
+                                    video_info["platform_videos"].append({
+                                        "platform": platform_video.get("platform", platform),
+                                        "video_id": platform_video.get("video_id", ""),
+                                        "url": platform_video.get("url", ""),
+                                        "upload_status": platform_video.get("upload_status", ""),
+                                        "upload_time": platform_video.get("upload_time"),
+                                        "error_message": platform_video.get("error_message"),
+                                        "error_time": platform_video.get("error_time")
+                                    })
                 
                 result["videos"].append(video_info)
             
